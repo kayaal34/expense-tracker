@@ -38,6 +38,20 @@ def append_expense(path, amount, category, note="", day=None):
     return row
 
 
+def monthly_summary(rows, month):
+    """Return (total, {category: amount}) for a YYYY-MM month."""
+    by_category = defaultdict(float)
+    for row in rows:
+        if row["date"].startswith(month):
+            by_category[row["category"]] += row["amount"]
+    return sum(by_category.values()), dict(by_category)
+
+
+def bar(value, maximum, width=20):
+    filled = round(width * value / maximum) if maximum else 0
+    return "#" * filled
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Simple expense tracker")
     parser.add_argument("--file", type=Path, default=DEFAULT_FILE)
@@ -50,6 +64,10 @@ def main(argv=None):
 
     sub.add_parser("list", help="show all expenses")
 
+    p_sum = sub.add_parser("summary", help="totals per category for a month")
+    p_sum.add_argument("month", nargs="?", default=date.today().strftime("%Y-%m"),
+                       help="month as YYYY-MM (default: current month)")
+
     args = parser.parse_args(argv)
 
     if args.command == "add":
@@ -58,6 +76,16 @@ def main(argv=None):
     elif args.command == "list":
         for row in read_expenses(args.file):
             print(f"{row['date']}  {row['amount']:>10.2f}  {row['category']:<12} {row['note']}")
+    elif args.command == "summary":
+        total, by_category = monthly_summary(read_expenses(args.file), args.month)
+        if not by_category:
+            print(f"No expenses for {args.month}.")
+            return
+        top = max(by_category.values())
+        print(f"Summary for {args.month}")
+        for category, amount in sorted(by_category.items(), key=lambda kv: -kv[1]):
+            print(f"  {category:<12} {amount:>10.2f}  {bar(amount, top)}")
+        print(f"  {'total':<12} {total:>10.2f}")
 
 
 if __name__ == "__main__":
