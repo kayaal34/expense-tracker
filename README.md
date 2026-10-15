@@ -32,3 +32,5 @@ Use `--file path/to/file.csv` to keep separate ledgers.
 pip install pytest
 pytest
 ```
+
+![tests](https://github.com/kayaal34/expense-tracker/actions/workflows/tests.yml/badge.svg)
