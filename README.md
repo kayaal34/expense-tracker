@@ -9,8 +9,10 @@ plain CSV file, so you can also open them in Excel or Google Sheets.
 python expenses.py add 120 food market shopping
 python expenses.py add 45.5 transport taxi
 python expenses.py list
+python expenses.py list --category food --month 2026-09
 python expenses.py summary            # current month
 python expenses.py summary 2026-08    # a specific month
+python expenses.py summary --json summary.json
 ```
 
 Example summary:
