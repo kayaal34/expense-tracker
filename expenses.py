@@ -56,6 +56,15 @@ def monthly_summary(rows, month):
     return sum(by_category.values()), dict(by_category)
 
 
+def export_summary(rows, month, out_path):
+    total, by_category = monthly_summary(rows, month)
+    data = {"month": month, "total": round(total, 2),
+            "categories": {k: round(v, 2) for k, v in sorted(by_category.items())}}
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    return data
+
+
 def bar(value, maximum, width=20):
     filled = round(width * value / maximum) if maximum else 0
     return "#" * filled
@@ -78,6 +87,7 @@ def main(argv=None):
     p_sum = sub.add_parser("summary", help="totals per category for a month")
     p_sum.add_argument("month", nargs="?", default=date.today().strftime("%Y-%m"),
                        help="month as YYYY-MM (default: current month)")
+    p_sum.add_argument("--json", type=Path, metavar="FILE", help="also write the summary to a JSON file")
 
     args = parser.parse_args(argv)
 
@@ -99,6 +109,9 @@ def main(argv=None):
         for category, amount in sorted(by_category.items(), key=lambda kv: -kv[1]):
             print(f"  {category:<12} {amount:>10.2f}  {bar(amount, top)}")
         print(f"  {'total':<12} {total:>10.2f}")
+        if args.json:
+            export_summary(read_expenses(args.file), args.month, args.json)
+            print(f"Saved summary to {args.json}")
 
 
 if __name__ == "__main__":
