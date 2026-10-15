@@ -32,3 +32,13 @@ def test_bar_scales_to_width():
     assert expenses.bar(10, 10, width=20) == "#" * 20
     assert expenses.bar(5, 10, width=20) == "#" * 10
     assert expenses.bar(0, 0) == ""
+
+
+def test_filter_expenses(tmp_path):
+    path = tmp_path / "e.csv"
+    expenses.append_expense(path, 10, "food", day=date(2026, 9, 1))
+    expenses.append_expense(path, 7, "bills", day=date(2026, 9, 3))
+    expenses.append_expense(path, 99, "food", day=date(2026, 8, 31))
+    rows = expenses.read_expenses(path)
+    assert [r["amount"] for r in expenses.filter_expenses(rows, "FOOD")] == [10, 99]
+    assert [r["amount"] for r in expenses.filter_expenses(rows, "food", "2026-09")] == [10]
