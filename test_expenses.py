@@ -52,3 +52,45 @@ def test_export_summary(tmp_path):
     expenses.export_summary(expenses.read_expenses(path), "2026-09", out)
     assert json.loads(out.read_text(encoding="utf-8")) == {
         "month": "2026-09", "total": 10.0, "categories": {"food": 10.0}}
+
+
+def test_budgets_roundtrip(tmp_path):
+    path = expenses.budget_path(tmp_path / "e.csv")
+    assert path.name == "e.budgets.json"
+    assert expenses.load_budgets(path) == {}
+    budgets = expenses.set_budget({}, "Food", 300)
+    expenses.save_budgets(path, budgets)
+    assert expenses.load_budgets(path) == {"food": 300}
+
+
+def test_budget_must_be_positive():
+    with pytest.raises(ValueError):
+        expenses.set_budget({}, "food", 0)
+
+
+def test_budget_cli(tmp_path, capsys):
+    ledger = tmp_path / "e.csv"
+    expenses.main(["--file", str(ledger), "budget", "set", "Food", "250"])
+    expenses.main(["--file", str(ledger), "budget"])
+    assert "food" in capsys.readouterr().out
+    expenses.main(["--file", str(ledger), "budget", "rm", "food"])
+    with pytest.raises(SystemExit):
+        expenses.main(["--file", str(ledger), "budget", "rm", "food"])
+
+
+def test_budget_status():
+    assert expenses.budget_status(150, 300) == "50% of 300.00"
+    assert expenses.budget_status(330, 300) == "110% of 300.00  OVER BUDGET by 30.00"
+
+
+def test_summary_shows_budget_and_add_warns(tmp_path, capsys):
+    ledger = tmp_path / "e.csv"
+    month = date.today().strftime("%Y-%m")
+    expenses.main(["--file", str(ledger), "budget", "set", "food", "100"])
+    expenses.main(["--file", str(ledger), "add", "80", "food"])
+    assert "Warning" not in capsys.readouterr().out
+    expenses.main(["--file", str(ledger), "add", "40", "food"])
+    assert "over its budget" in capsys.readouterr().out
+    expenses.main(["--file", str(ledger), "summary", month])
+    out = capsys.readouterr().out
+    assert "120% of 100.00  OVER BUDGET by 20.00" in out

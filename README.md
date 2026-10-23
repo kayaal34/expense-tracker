@@ -24,6 +24,23 @@ Summary for 2026-09
   total            225.50
 ```
 
+### Budgets
+
+```bash
+python expenses.py budget set food 300   # monthly budget per category
+python expenses.py budget                # list budgets
+python expenses.py budget rm food
+```
+
+`summary` then shows how much of each budget is used, and `add` warns when a
+category goes over its budget for the month:
+
+```
+  food             330.00  ####################  110% of 300.00  OVER BUDGET by 30.00
+```
+
+Budgets are stored next to the ledger (`expenses.budgets.json`).
+
 Use `--file path/to/file.csv` to keep separate ledgers.
 
 ## Tests
