@@ -52,3 +52,27 @@ def test_export_summary(tmp_path):
     expenses.export_summary(expenses.read_expenses(path), "2026-09", out)
     assert json.loads(out.read_text(encoding="utf-8")) == {
         "month": "2026-09", "total": 10.0, "categories": {"food": 10.0}}
+
+
+def test_budgets_roundtrip(tmp_path):
+    path = expenses.budget_path(tmp_path / "e.csv")
+    assert path.name == "e.budgets.json"
+    assert expenses.load_budgets(path) == {}
+    budgets = expenses.set_budget({}, "Food", 300)
+    expenses.save_budgets(path, budgets)
+    assert expenses.load_budgets(path) == {"food": 300}
+
+
+def test_budget_must_be_positive():
+    with pytest.raises(ValueError):
+        expenses.set_budget({}, "food", 0)
+
+
+def test_budget_cli(tmp_path, capsys):
+    ledger = tmp_path / "e.csv"
+    expenses.main(["--file", str(ledger), "budget", "set", "Food", "250"])
+    expenses.main(["--file", str(ledger), "budget"])
+    assert "food" in capsys.readouterr().out
+    expenses.main(["--file", str(ledger), "budget", "rm", "food"])
+    with pytest.raises(SystemExit):
+        expenses.main(["--file", str(ledger), "budget", "rm", "food"])

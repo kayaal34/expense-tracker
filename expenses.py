@@ -65,6 +65,30 @@ def export_summary(rows, month, out_path):
     return data
 
 
+def budget_path(expenses_path):
+    """Budgets live next to the ledger: expenses.csv -> expenses.budgets.json."""
+    return expenses_path.with_suffix(".budgets.json")
+
+
+def load_budgets(path):
+    if not path.exists():
+        return {}
+    with path.open(encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_budgets(path, budgets):
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(dict(sorted(budgets.items())), f, indent=2, ensure_ascii=False)
+
+
+def set_budget(budgets, category, amount):
+    if amount <= 0:
+        raise ValueError("budget must be positive")
+    budgets[category.lower()] = round(amount, 2)
+    return budgets
+
+
 def bar(value, maximum, width=20):
     filled = round(width * value / maximum) if maximum else 0
     return "#" * filled
@@ -89,6 +113,14 @@ def main(argv=None):
                        help="month as YYYY-MM (default: current month)")
     p_sum.add_argument("--json", type=Path, metavar="FILE", help="also write the summary to a JSON file")
 
+    p_budget = sub.add_parser("budget", help="show or change monthly budgets per category")
+    budget_sub = p_budget.add_subparsers(dest="budget_command")
+    p_bset = budget_sub.add_parser("set", help="set the monthly budget for a category")
+    p_bset.add_argument("category")
+    p_bset.add_argument("amount", type=float)
+    p_brm = budget_sub.add_parser("rm", help="remove the budget for a category")
+    p_brm.add_argument("category")
+
     args = parser.parse_args(argv)
 
     if args.command == "add":
@@ -112,6 +144,24 @@ def main(argv=None):
         if args.json:
             export_summary(read_expenses(args.file), args.month, args.json)
             print(f"Saved summary to {args.json}")
+
+    elif args.command == "budget":
+        path = budget_path(args.file)
+        budgets = load_budgets(path)
+        if args.budget_command == "set":
+            set_budget(budgets, args.category, args.amount)
+            save_budgets(path, budgets)
+            print(f"Budget for '{args.category.lower()}' set to {budgets[args.category.lower()]:.2f} per month")
+        elif args.budget_command == "rm":
+            if budgets.pop(args.category.lower(), None) is None:
+                raise SystemExit(f"No budget for '{args.category.lower()}'")
+            save_budgets(path, budgets)
+            print(f"Removed budget for '{args.category.lower()}'")
+        elif not budgets:
+            print("No budgets set. Use: budget set <category> <amount>")
+        else:
+            for category, amount in budgets.items():
+                print(f"  {category:<12} {amount:>10.2f}")
 
 
 if __name__ == "__main__":
