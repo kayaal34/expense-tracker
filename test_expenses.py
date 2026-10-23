@@ -76,3 +76,21 @@ def test_budget_cli(tmp_path, capsys):
     expenses.main(["--file", str(ledger), "budget", "rm", "food"])
     with pytest.raises(SystemExit):
         expenses.main(["--file", str(ledger), "budget", "rm", "food"])
+
+
+def test_budget_status():
+    assert expenses.budget_status(150, 300) == "50% of 300.00"
+    assert expenses.budget_status(330, 300) == "110% of 300.00  OVER BUDGET by 30.00"
+
+
+def test_summary_shows_budget_and_add_warns(tmp_path, capsys):
+    ledger = tmp_path / "e.csv"
+    month = date.today().strftime("%Y-%m")
+    expenses.main(["--file", str(ledger), "budget", "set", "food", "100"])
+    expenses.main(["--file", str(ledger), "add", "80", "food"])
+    assert "Warning" not in capsys.readouterr().out
+    expenses.main(["--file", str(ledger), "add", "40", "food"])
+    assert "over its budget" in capsys.readouterr().out
+    expenses.main(["--file", str(ledger), "summary", month])
+    out = capsys.readouterr().out
+    assert "120% of 100.00  OVER BUDGET by 20.00" in out

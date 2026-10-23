@@ -89,6 +89,13 @@ def set_budget(budgets, category, amount):
     return budgets
 
 
+def budget_status(spent, budget):
+    """Short text comparing spending with a budget, e.g. '60% of 300.00'."""
+    used = spent / budget * 100
+    text = f"{used:.0f}% of {budget:.2f}"
+    return f"{text}  OVER BUDGET by {spent - budget:.2f}" if spent > budget else text
+
+
 def bar(value, maximum, width=20):
     filled = round(width * value / maximum) if maximum else 0
     return "#" * filled
@@ -126,6 +133,13 @@ def main(argv=None):
     if args.command == "add":
         row = append_expense(args.file, args.amount, args.category, " ".join(args.note))
         print(f"Saved {row['amount']} in '{row['category']}'")
+        budget = load_budgets(budget_path(args.file)).get(row["category"])
+        if budget:
+            month = row["date"][:7]
+            _, by_category = monthly_summary(read_expenses(args.file), month)
+            spent = by_category.get(row["category"], 0)
+            if spent > budget:
+                print(f"Warning: '{row['category']}' is over its budget for {month}: {budget_status(spent, budget)}")
     elif args.command == "list":
         rows = filter_expenses(read_expenses(args.file), args.category, args.month)
         for row in rows:
@@ -137,9 +151,13 @@ def main(argv=None):
             print(f"No expenses for {args.month}.")
             return
         top = max(by_category.values())
+        budgets = load_budgets(budget_path(args.file))
         print(f"Summary for {args.month}")
         for category, amount in sorted(by_category.items(), key=lambda kv: -kv[1]):
-            print(f"  {category:<12} {amount:>10.2f}  {bar(amount, top)}")
+            line = f"  {category:<12} {amount:>10.2f}  {bar(amount, top):<20}"
+            if category in budgets:
+                line += f"  {budget_status(amount, budgets[category])}"
+            print(line.rstrip())
         print(f"  {'total':<12} {total:>10.2f}")
         if args.json:
             export_summary(read_expenses(args.file), args.month, args.json)
