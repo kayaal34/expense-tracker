@@ -65,6 +65,26 @@ def export_summary(rows, month, out_path):
     return data
 
 
+def previous_months(month, count):
+    """The *count* months ending with *month* (YYYY-MM), oldest first."""
+    year, mon = map(int, month.split("-"))
+    months = []
+    for _ in range(count):
+        months.append(f"{year:04d}-{mon:02d}")
+        year, mon = (year - 1, 12) if mon == 1 else (year, mon - 1)
+    return months[::-1]
+
+
+def monthly_trend(rows, months, category=None):
+    """Total spent per month (optionally for one category), in the order of *months*."""
+    totals = dict.fromkeys(months, 0.0)
+    for row in filter_expenses(rows, category):
+        month = row["date"][:7]
+        if month in totals:
+            totals[month] += row["amount"]
+    return totals
+
+
 def budget_path(expenses_path):
     """Budgets live next to the ledger: expenses.csv -> expenses.budgets.json."""
     return expenses_path.with_suffix(".budgets.json")
@@ -120,6 +140,12 @@ def main(argv=None):
                        help="month as YYYY-MM (default: current month)")
     p_sum.add_argument("--json", type=Path, metavar="FILE", help="also write the summary to a JSON file")
 
+    p_trend = sub.add_parser("trend", help="monthly totals over the last months")
+    p_trend.add_argument("category", nargs="?", help="only this category (default: everything)")
+    p_trend.add_argument("-n", "--months", type=int, default=6, help="how many months (default: 6)")
+    p_trend.add_argument("--until", default=date.today().strftime("%Y-%m"),
+                         help="last month to show, YYYY-MM (default: current month)")
+
     p_budget = sub.add_parser("budget", help="show or change monthly budgets per category")
     budget_sub = p_budget.add_subparsers(dest="budget_command")
     p_bset = budget_sub.add_parser("set", help="set the monthly budget for a category")
@@ -163,6 +189,16 @@ def main(argv=None):
             export_summary(read_expenses(args.file), args.month, args.json)
             print(f"Saved summary to {args.json}")
 
+    elif args.command == "trend":
+        if args.months < 1:
+            raise SystemExit("--months must be at least 1")
+        totals = monthly_trend(read_expenses(args.file), previous_months(args.until, args.months), args.category)
+        top = max(totals.values())
+        label = args.category.lower() if args.category else "all categories"
+        print(f"Monthly totals for {label}")
+        for month, amount in totals.items():
+            print(f"  {month}  {amount:>10.2f}  {bar(amount, top)}".rstrip())
+        print(f"  {'average':<7}  {sum(totals.values()) / len(totals):>10.2f}")
     elif args.command == "budget":
         path = budget_path(args.file)
         budgets = load_budgets(path)

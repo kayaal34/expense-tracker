@@ -24,6 +24,21 @@ Summary for 2026-09
   total            225.50
 ```
 
+### Trend
+
+```bash
+python expenses.py trend              # last 6 months, all categories
+python expenses.py trend food -n 12   # one category, last 12 months
+```
+
+```
+Monthly totals for food
+  2026-08       210.00  ##############
+  2026-09       300.00  ####################
+  2026-10       180.00  ############
+  average       230.00
+```
+
 ### Budgets
 
 ```bash

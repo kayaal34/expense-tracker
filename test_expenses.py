@@ -94,3 +94,28 @@ def test_summary_shows_budget_and_add_warns(tmp_path, capsys):
     expenses.main(["--file", str(ledger), "summary", month])
     out = capsys.readouterr().out
     assert "120% of 100.00  OVER BUDGET by 20.00" in out
+
+
+def test_previous_months_crosses_year():
+    assert expenses.previous_months("2026-02", 4) == ["2025-11", "2025-12", "2026-01", "2026-02"]
+
+
+def test_monthly_trend(tmp_path):
+    path = tmp_path / "e.csv"
+    expenses.append_expense(path, 10, "food", day=date(2026, 8, 3))
+    expenses.append_expense(path, 20, "food", day=date(2026, 9, 3))
+    expenses.append_expense(path, 5, "bills", day=date(2026, 9, 9))
+    expenses.append_expense(path, 99, "food", day=date(2026, 5, 1))  # outside the window
+    rows = expenses.read_expenses(path)
+    months = expenses.previous_months("2026-10", 3)
+    assert expenses.monthly_trend(rows, months, "Food") == {"2026-08": 10, "2026-09": 20, "2026-10": 0}
+    assert expenses.monthly_trend(rows, months) == {"2026-08": 10, "2026-09": 25, "2026-10": 0}
+
+
+def test_trend_cli(tmp_path, capsys):
+    ledger = tmp_path / "e.csv"
+    expenses.append_expense(ledger, 30, "food", day=date(2026, 9, 3))
+    expenses.main(["--file", str(ledger), "trend", "food", "-n", "2", "--until", "2026-10"])
+    out = capsys.readouterr().out
+    assert "2026-09       30.00  ####################" in out
+    assert "average       15.00" in out
