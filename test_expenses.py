@@ -141,3 +141,11 @@ def test_import_into_new_ledger_and_self(tmp_path, capsys):
     assert "Imported 1 expense(s), skipped 0" in capsys.readouterr().out
     with pytest.raises(SystemExit):
         expenses.main(["--file", str(ledger), "import", str(ledger)])
+
+
+def test_import_dry_run_writes_nothing(tmp_path, capsys):
+    ledger, other = tmp_path / "a.csv", tmp_path / "b.csv"
+    expenses.append_expense(other, 3, "coffee", day=date(2026, 10, 3))
+    expenses.main(["--file", str(ledger), "import", "--dry-run", str(other)])
+    assert "Would import 1 expense(s)" in capsys.readouterr().out
+    assert not ledger.exists()

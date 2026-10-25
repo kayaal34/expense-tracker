@@ -43,10 +43,10 @@ def _row_key(row):
     return (row["date"], f"{float(row['amount']):.2f}", row["category"].lower(), row.get("note", ""))
 
 
-def import_expenses(path, source):
+def import_expenses(path, source, dry_run=False):
     """Append the rows of another ledger to *path*, skipping rows that are
     already there (same date, amount, category and note).
-    Returns (added, skipped)."""
+    With *dry_run* nothing is written. Returns (added, skipped)."""
     existing = {_row_key(row) for row in read_expenses(path)}
     added = skipped = 0
     for row in read_expenses(source):
@@ -54,8 +54,9 @@ def import_expenses(path, source):
         if key in existing:
             skipped += 1
             continue
-        append_expense(path, row["amount"], row["category"], row.get("note", ""),
-                       day=date.fromisoformat(row["date"]))
+        if not dry_run:
+            append_expense(path, row["amount"], row["category"], row.get("note", ""),
+                           day=date.fromisoformat(row["date"]))
         existing.add(key)
         added += 1
     return added, skipped
@@ -164,6 +165,8 @@ def main(argv=None):
 
     p_import = sub.add_parser("import", help="merge another ledger CSV, skipping duplicates")
     p_import.add_argument("source", type=Path)
+    p_import.add_argument("-n", "--dry-run", action="store_true",
+                          help="only report what would be imported")
 
     p_trend = sub.add_parser("trend", help="monthly totals over the last months")
     p_trend.add_argument("category", nargs="?", help="only this category (default: everything)")
@@ -217,8 +220,9 @@ def main(argv=None):
     elif args.command == "import":
         if args.source.resolve() == args.file.resolve():
             raise SystemExit("Cannot import a ledger into itself")
-        added, skipped = import_expenses(args.file, args.source)
-        print(f"Imported {added} expense(s), skipped {skipped} duplicate(s)")
+        added, skipped = import_expenses(args.file, args.source, args.dry_run)
+        verb = "Would import" if args.dry_run else "Imported"
+        print(f"{verb} {added} expense(s), skipped {skipped} duplicate(s)")
     elif args.command == "trend":
         if args.months < 1:
             raise SystemExit("--months must be at least 1")
