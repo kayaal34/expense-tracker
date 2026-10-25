@@ -119,3 +119,33 @@ def test_trend_cli(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "2026-09       30.00  ####################" in out
     assert "average       15.00" in out
+
+
+def test_import_skips_duplicates(tmp_path):
+    ledger, other = tmp_path / "a.csv", tmp_path / "b.csv"
+    expenses.append_expense(ledger, 10, "food", "lunch", day=date(2026, 10, 1))
+    expenses.append_expense(other, 10, "Food", "lunch", day=date(2026, 10, 1))  # same expense
+    expenses.append_expense(other, 10, "food", "dinner", day=date(2026, 10, 1))
+    expenses.append_expense(other, 7.5, "bills", day=date(2026, 10, 2))
+    expenses.append_expense(other, 7.5, "bills", day=date(2026, 10, 2))  # duplicate within source
+    assert expenses.import_expenses(ledger, other) == (2, 2)
+    assert expenses.import_expenses(ledger, other) == (0, 4)
+    assert [(r["category"], r["amount"], r["note"]) for r in expenses.read_expenses(ledger)] == [
+        ("food", 10.0, "lunch"), ("food", 10.0, "dinner"), ("bills", 7.5, "")]
+
+
+def test_import_into_new_ledger_and_self(tmp_path, capsys):
+    ledger, other = tmp_path / "new.csv", tmp_path / "b.csv"
+    expenses.append_expense(other, 3, "coffee", day=date(2026, 10, 3))
+    expenses.main(["--file", str(ledger), "import", str(other)])
+    assert "Imported 1 expense(s), skipped 0" in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        expenses.main(["--file", str(ledger), "import", str(ledger)])
+
+
+def test_import_dry_run_writes_nothing(tmp_path, capsys):
+    ledger, other = tmp_path / "a.csv", tmp_path / "b.csv"
+    expenses.append_expense(other, 3, "coffee", day=date(2026, 10, 3))
+    expenses.main(["--file", str(ledger), "import", "--dry-run", str(other)])
+    assert "Would import 1 expense(s)" in capsys.readouterr().out
+    assert not ledger.exists()

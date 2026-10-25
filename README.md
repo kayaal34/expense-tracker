@@ -24,6 +24,18 @@ Summary for 2026-09
   total            225.50
 ```
 
+### Import
+
+```bash
+python expenses.py import phone.csv --dry-run   # show what would be added
+python expenses.py import phone.csv
+```
+
+Merges another ledger in the same CSV format into the current one. A row is
+skipped when the ledger already has one with the same date, amount, category
+and note, so importing the same file twice adds nothing. (Two genuinely
+identical expenses on the same day need different notes to both be kept.)
+
 ### Trend
 
 ```bash
