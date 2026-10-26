@@ -149,3 +149,45 @@ def test_import_dry_run_writes_nothing(tmp_path, capsys):
     expenses.main(["--file", str(ledger), "import", "--dry-run", str(other)])
     assert "Would import 1 expense(s)" in capsys.readouterr().out
     assert not ledger.exists()
+
+
+def _ledger(tmp_path):
+    path = tmp_path / "e.csv"
+    expenses.append_expense(path, 10, "food", "lunch", day=date(2026, 10, 1))
+    expenses.append_expense(path, 25, "bills", "phone", day=date(2026, 10, 2))
+    expenses.append_expense(path, 4.5, "food", "coffee", day=date(2026, 10, 3))
+    return path
+
+
+def test_delete_expense(tmp_path):
+    path = _ledger(tmp_path)
+    removed = expenses.delete_expense(path, 2)
+    assert removed["note"] == "phone"
+    assert [r["note"] for r in expenses.read_expenses(path)] == ["lunch", "coffee"]
+    with pytest.raises(SystemExit):
+        expenses.delete_expense(path, 3)
+    with pytest.raises(SystemExit):
+        expenses.delete_expense(path, 0)
+
+
+def test_edit_expense(tmp_path):
+    path = _ledger(tmp_path)
+    expenses.edit_expense(path, 3, amount=5, category="Drinks", day=date(2026, 10, 4))
+    row = expenses.read_expenses(path)[2]
+    assert row == {"date": "2026-10-04", "amount": 5.0, "category": "drinks", "note": "coffee"}
+    with pytest.raises(ValueError):
+        expenses.edit_expense(path, 1, amount=-1)
+    # nothing else changed and no temporary files are left behind
+    assert [r["note"] for r in expenses.read_expenses(path)] == ["lunch", "phone", "coffee"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["e.csv"]
+
+
+def test_list_numbers_survive_filtering(tmp_path, capsys):
+    path = _ledger(tmp_path)
+    expenses.main(["--file", str(path), "list", "--category", "food"])
+    out = capsys.readouterr().out.splitlines()
+    assert out[0].startswith("#1 ") and out[1].startswith("#3 ")
+    expenses.main(["--file", str(path), "rm", "3"])
+    assert "Deleted #3: 2026-10-03 4.50 food coffee" in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        expenses.main(["--file", str(path), "edit", "1"])
