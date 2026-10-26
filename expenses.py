@@ -3,6 +3,8 @@
 import argparse
 import csv
 import json
+import os
+import tempfile
 from collections import defaultdict
 from datetime import date
 from pathlib import Path
@@ -36,6 +38,55 @@ def append_expense(path, amount, category, note="", day=None):
         if new_file:
             writer.writeheader()
         writer.writerow(row)
+    return row
+
+
+def write_expenses(path, rows):
+    """Rewrite the whole ledger. Writes a temporary file next to it and renames
+    it over the ledger, so an interrupted write can't leave it half-written."""
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=FIELDS)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({**row, "amount": f"{float(row['amount']):.2f}"})
+        os.replace(tmp, path)
+    except BaseException:
+        os.unlink(tmp)
+        raise
+
+
+def _get_row(rows, number):
+    if not 1 <= number <= len(rows):
+        raise SystemExit(f"No expense #{number} (the ledger has {len(rows)})")
+    return rows[number - 1]
+
+
+def delete_expense(path, number):
+    """Remove expense #number (1-based, as shown by `list`). Returns the removed row."""
+    rows = read_expenses(path)
+    row = _get_row(rows, number)
+    rows.remove(row)
+    write_expenses(path, rows)
+    return row
+
+
+def edit_expense(path, number, amount=None, category=None, note=None, day=None):
+    """Change fields of expense #number. Returns the updated row."""
+    rows = read_expenses(path)
+    row = _get_row(rows, number)
+    if amount is not None:
+        if amount <= 0:
+            raise ValueError("amount must be positive")
+        row["amount"] = amount
+    if category is not None:
+        row["category"] = category.lower()
+    if note is not None:
+        row["note"] = note
+    if day is not None:
+        row["date"] = day.isoformat()
+    write_expenses(path, rows)
     return row
 
 
@@ -163,6 +214,16 @@ def main(argv=None):
                        help="month as YYYY-MM (default: current month)")
     p_sum.add_argument("--json", type=Path, metavar="FILE", help="also write the summary to a JSON file")
 
+    p_rm = sub.add_parser("rm", help="delete an expense by its number from `list`")
+    p_rm.add_argument("number", type=int)
+
+    p_edit = sub.add_parser("edit", help="change an expense by its number from `list`")
+    p_edit.add_argument("number", type=int)
+    p_edit.add_argument("--amount", type=float)
+    p_edit.add_argument("--category")
+    p_edit.add_argument("--note")
+    p_edit.add_argument("--date", type=date.fromisoformat, help="YYYY-MM-DD")
+
     p_import = sub.add_parser("import", help="merge another ledger CSV, skipping duplicates")
     p_import.add_argument("source", type=Path)
     p_import.add_argument("-n", "--dry-run", action="store_true",
@@ -195,9 +256,11 @@ def main(argv=None):
             if spent > budget:
                 print(f"Warning: '{row['category']}' is over its budget for {month}: {budget_status(spent, budget)}")
     elif args.command == "list":
-        rows = filter_expenses(read_expenses(args.file), args.category, args.month)
+        all_rows = read_expenses(args.file)
+        rows = filter_expenses(all_rows, args.category, args.month)
+        numbers = {id(row): n for n, row in enumerate(all_rows, 1)}
         for row in rows:
-            print(f"{row['date']}  {row['amount']:>10.2f}  {row['category']:<12} {row['note']}")
+            print(f"#{numbers[id(row)]:<4} {row['date']}  {row['amount']:>10.2f}  {row['category']:<12} {row['note']}")
         print(f"{len(rows)} expense(s), total {sum(r['amount'] for r in rows):.2f}")
     elif args.command == "summary":
         total, by_category = monthly_summary(read_expenses(args.file), args.month)
@@ -217,6 +280,14 @@ def main(argv=None):
             export_summary(read_expenses(args.file), args.month, args.json)
             print(f"Saved summary to {args.json}")
 
+    elif args.command == "rm":
+        row = delete_expense(args.file, args.number)
+        print(f"Deleted #{args.number}: {row['date']} {row['amount']:.2f} {row['category']} {row['note']}".rstrip())
+    elif args.command == "edit":
+        if all(v is None for v in (args.amount, args.category, args.note, args.date)):
+            raise SystemExit("Nothing to change: pass --amount, --category, --note or --date")
+        row = edit_expense(args.file, args.number, args.amount, args.category, args.note, args.date)
+        print(f"Updated #{args.number}: {row['date']} {float(row['amount']):.2f} {row['category']} {row['note']}".rstrip())
     elif args.command == "import":
         if args.source.resolve() == args.file.resolve():
             raise SystemExit("Cannot import a ledger into itself")
