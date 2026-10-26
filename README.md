@@ -8,7 +8,9 @@ plain CSV file, so you can also open them in Excel or Google Sheets.
 ```bash
 python expenses.py add 120 food market shopping
 python expenses.py add 45.5 transport taxi
-python expenses.py list
+python expenses.py list                      # rows are numbered: #1, #2, ...
+python expenses.py edit 2 --amount 12.5 --note "taxi home"
+python expenses.py rm 3
 python expenses.py list --category food --month 2026-09
 python expenses.py summary            # current month
 python expenses.py summary 2026-08    # a specific month
@@ -67,6 +69,10 @@ category goes over its budget for the month:
 ```
 
 Budgets are stored next to the ledger (`expenses.budgets.json`).
+
+`rm` and `edit` use the numbers shown by `list` (they stay the same when you filter with
+`--category` / `--month`). Both rewrite the ledger through a temporary file, so an
+interrupted write can't leave it half-written.
 
 Use `--file path/to/file.csv` to keep separate ledgers.
 
