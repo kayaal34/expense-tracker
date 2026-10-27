@@ -238,6 +238,12 @@ def main(argv=None):
                        help="month as YYYY-MM (default: current month)")
     p_sum.add_argument("--json", type=Path, metavar="FILE", help="also write the summary to a JSON file")
 
+    p_report = sub.add_parser("report", help="monthly report in Markdown")
+    p_report.add_argument("month", nargs="?", default=date.today().strftime("%Y-%m"),
+                          help="month as YYYY-MM (default: current month)")
+    p_report.add_argument("-o", "--output", type=Path, help="write to a file instead of printing")
+    p_report.add_argument("--top", type=int, default=5, help="largest expenses to list (default: 5)")
+
     p_rm = sub.add_parser("rm", help="delete an expense by its number from `list`")
     p_rm.add_argument("number", type=int)
 
@@ -304,6 +310,14 @@ def main(argv=None):
             export_summary(read_expenses(args.file), args.month, args.json)
             print(f"Saved summary to {args.json}")
 
+    elif args.command == "report":
+        text = markdown_report(read_expenses(args.file), args.month,
+                               load_budgets(budget_path(args.file)), args.top)
+        if args.output:
+            args.output.write_text(text, encoding="utf-8")
+            print(f"Saved report for {args.month} to {args.output}")
+        else:
+            print(text, end="")
     elif args.command == "rm":
         row = delete_expense(args.file, args.number)
         print(f"Deleted #{args.number}: {row['date']} {row['amount']:.2f} {row['category']} {row['note']}".rstrip())

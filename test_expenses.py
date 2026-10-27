@@ -212,3 +212,13 @@ def test_markdown_report_empty_month(tmp_path):
     report = expenses.markdown_report([], "2026-10")
     assert report.splitlines()[:3] == ["# Expenses 2026-10", "", "**Total:** 0.00"]
     assert "Largest" not in report
+
+
+def test_report_cli(tmp_path, capsys):
+    ledger = tmp_path / "e.csv"
+    out = tmp_path / "report.md"
+    expenses.append_expense(ledger, 12, "food", day=date(2026, 10, 2))
+    expenses.main(["--file", str(ledger), "budget", "set", "food", "10"])
+    expenses.main(["--file", str(ledger), "report", "2026-10", "-o", str(out)])
+    text = out.read_text(encoding="utf-8")
+    assert text.startswith("# Expenses 2026-10") and "OVER BUDGET by 2.00" in text

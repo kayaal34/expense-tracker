@@ -26,6 +26,16 @@ Summary for 2026-09
   total            225.50
 ```
 
+### Report
+
+```bash
+python expenses.py report 2026-10 -o october.md
+```
+
+Writes a Markdown report for the month: the total and its change from the previous
+month, a table per category with its share and budget use, and the largest expenses.
+Handy for pasting into notes or a GitHub issue.
+
 ### Import
 
 ```bash
