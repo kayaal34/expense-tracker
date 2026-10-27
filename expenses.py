@@ -190,6 +190,30 @@ def budget_status(spent, budget):
     return f"{text}  OVER BUDGET by {spent - budget:.2f}" if spent > budget else text
 
 
+def markdown_report(rows, month, budgets=None, top=5):
+    """A Markdown report for *month*: totals per category (with budget use),
+    the largest expenses and the change from the previous month."""
+    budgets = budgets or {}
+    total, by_category = monthly_summary(rows, month)
+    previous = previous_months(month, 2)[0]
+    prev_total, _ = monthly_summary(rows, previous)
+    lines = [f"# Expenses {month}", "", f"**Total:** {total:.2f}"]
+    if prev_total:
+        change = (total - prev_total) / prev_total * 100
+        lines[-1] += f" ({change:+.0f}% vs {previous})"
+    lines += ["", "| Category | Amount | Share | Budget |", "|---|---:|---:|---|"]
+    for category, amount in sorted(by_category.items(), key=lambda kv: -kv[1]):
+        share = amount / total * 100 if total else 0
+        budget = budget_status(amount, budgets[category]) if category in budgets else ""
+        lines.append(f"| {category} | {amount:.2f} | {share:.0f}% | {budget} |")
+    month_rows = sorted(filter_expenses(rows, month=month), key=lambda r: -r["amount"])[:top]
+    if month_rows:
+        lines += ["", f"## Largest {len(month_rows)}", ""]
+        lines += [f"- {r['date']} **{r['amount']:.2f}** {r['category']}" + (f" ({r['note']})" if r["note"] else "")
+                  for r in month_rows]
+    return "\n".join(lines) + "\n"
+
+
 def bar(value, maximum, width=20):
     filled = round(width * value / maximum) if maximum else 0
     return "#" * filled
@@ -213,6 +237,12 @@ def main(argv=None):
     p_sum.add_argument("month", nargs="?", default=date.today().strftime("%Y-%m"),
                        help="month as YYYY-MM (default: current month)")
     p_sum.add_argument("--json", type=Path, metavar="FILE", help="also write the summary to a JSON file")
+
+    p_report = sub.add_parser("report", help="monthly report in Markdown")
+    p_report.add_argument("month", nargs="?", default=date.today().strftime("%Y-%m"),
+                          help="month as YYYY-MM (default: current month)")
+    p_report.add_argument("-o", "--output", type=Path, help="write to a file instead of printing")
+    p_report.add_argument("--top", type=int, default=5, help="largest expenses to list (default: 5)")
 
     p_rm = sub.add_parser("rm", help="delete an expense by its number from `list`")
     p_rm.add_argument("number", type=int)
@@ -280,6 +310,14 @@ def main(argv=None):
             export_summary(read_expenses(args.file), args.month, args.json)
             print(f"Saved summary to {args.json}")
 
+    elif args.command == "report":
+        text = markdown_report(read_expenses(args.file), args.month,
+                               load_budgets(budget_path(args.file)), args.top)
+        if args.output:
+            args.output.write_text(text, encoding="utf-8")
+            print(f"Saved report for {args.month} to {args.output}")
+        else:
+            print(text, end="")
     elif args.command == "rm":
         row = delete_expense(args.file, args.number)
         print(f"Deleted #{args.number}: {row['date']} {row['amount']:.2f} {row['category']} {row['note']}".rstrip())

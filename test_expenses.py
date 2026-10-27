@@ -191,3 +191,34 @@ def test_list_numbers_survive_filtering(tmp_path, capsys):
     assert "Deleted #3: 2026-10-03 4.50 food coffee" in capsys.readouterr().out
     with pytest.raises(SystemExit):
         expenses.main(["--file", str(path), "edit", "1"])
+
+
+def test_markdown_report(tmp_path):
+    path = tmp_path / "e.csv"
+    expenses.append_expense(path, 100, "food", day=date(2026, 9, 5))
+    expenses.append_expense(path, 90, "food", "market", day=date(2026, 10, 2))
+    expenses.append_expense(path, 30, "bills", "phone", day=date(2026, 10, 4))
+    expenses.append_expense(path, 30, "fun", day=date(2026, 10, 9))
+    report = expenses.markdown_report(expenses.read_expenses(path), "2026-10", {"food": 80}, top=2)
+    lines = report.splitlines()
+    assert lines[0] == "# Expenses 2026-10"
+    assert lines[2] == "**Total:** 150.00 (+50% vs 2026-09)"
+    assert "| food | 90.00 | 60% | 112% of 80.00  OVER BUDGET by 10.00 |" in lines
+    assert "| bills | 30.00 | 20% |  |" in lines
+    assert lines[-2:] == ["- 2026-10-02 **90.00** food (market)", "- 2026-10-04 **30.00** bills (phone)"]
+
+
+def test_markdown_report_empty_month(tmp_path):
+    report = expenses.markdown_report([], "2026-10")
+    assert report.splitlines()[:3] == ["# Expenses 2026-10", "", "**Total:** 0.00"]
+    assert "Largest" not in report
+
+
+def test_report_cli(tmp_path, capsys):
+    ledger = tmp_path / "e.csv"
+    out = tmp_path / "report.md"
+    expenses.append_expense(ledger, 12, "food", day=date(2026, 10, 2))
+    expenses.main(["--file", str(ledger), "budget", "set", "food", "10"])
+    expenses.main(["--file", str(ledger), "report", "2026-10", "-o", str(out)])
+    text = out.read_text(encoding="utf-8")
+    assert text.startswith("# Expenses 2026-10") and "OVER BUDGET by 2.00" in text
