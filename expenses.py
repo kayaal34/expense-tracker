@@ -190,6 +190,30 @@ def budget_status(spent, budget):
     return f"{text}  OVER BUDGET by {spent - budget:.2f}" if spent > budget else text
 
 
+def markdown_report(rows, month, budgets=None, top=5):
+    """A Markdown report for *month*: totals per category (with budget use),
+    the largest expenses and the change from the previous month."""
+    budgets = budgets or {}
+    total, by_category = monthly_summary(rows, month)
+    previous = previous_months(month, 2)[0]
+    prev_total, _ = monthly_summary(rows, previous)
+    lines = [f"# Expenses {month}", "", f"**Total:** {total:.2f}"]
+    if prev_total:
+        change = (total - prev_total) / prev_total * 100
+        lines[-1] += f" ({change:+.0f}% vs {previous})"
+    lines += ["", "| Category | Amount | Share | Budget |", "|---|---:|---:|---|"]
+    for category, amount in sorted(by_category.items(), key=lambda kv: -kv[1]):
+        share = amount / total * 100 if total else 0
+        budget = budget_status(amount, budgets[category]) if category in budgets else ""
+        lines.append(f"| {category} | {amount:.2f} | {share:.0f}% | {budget} |")
+    month_rows = sorted(filter_expenses(rows, month=month), key=lambda r: -r["amount"])[:top]
+    if month_rows:
+        lines += ["", f"## Largest {len(month_rows)}", ""]
+        lines += [f"- {r['date']} **{r['amount']:.2f}** {r['category']}" + (f" ({r['note']})" if r["note"] else "")
+                  for r in month_rows]
+    return "\n".join(lines) + "\n"
+
+
 def bar(value, maximum, width=20):
     filled = round(width * value / maximum) if maximum else 0
     return "#" * filled
