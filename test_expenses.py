@@ -241,3 +241,23 @@ def test_list_search_keeps_ledger_numbers(tmp_path, capsys):
     expenses.main(["--file", str(ledger), "list", "--search", "taxi"])
     out = capsys.readouterr().out
     assert "#2" in out and "bread" not in out and "1 expense(s), total 9.00" in out
+
+
+def test_largest_expenses_breaks_ties_by_newest():
+    rows = [
+        {"date": "2026-09-01", "amount": 5.0, "category": "a", "note": "old"},
+        {"date": "2026-09-09", "amount": 5.0, "category": "a", "note": "new"},
+        {"date": "2026-09-02", "amount": 9.0, "category": "b", "note": "big"},
+        {"date": "2026-09-03", "amount": 1.0, "category": "c", "note": "small"},
+    ]
+    assert [r["note"] for r in expenses.largest_expenses(rows, 3)] == ["big", "new", "old"]
+
+
+def test_top_command(tmp_path, capsys):
+    ledger = tmp_path / "e.csv"
+    for amount in ("3", "8", "5"):
+        expenses.main(["--file", str(ledger), "add", amount, "food"])
+    capsys.readouterr()
+    expenses.main(["--file", str(ledger), "top", "-n", "2"])
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 2 and lines[0].startswith("#2") and lines[1].startswith("#3")
