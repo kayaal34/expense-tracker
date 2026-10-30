@@ -242,6 +242,11 @@ def main(argv=None):
     p_list.add_argument("-m", "--month", help="only show this month (YYYY-MM)")
     p_list.add_argument("-s", "--search", help="only show notes containing this text")
 
+    p_top = sub.add_parser("top", help="the largest expenses")
+    p_top.add_argument("-n", "--count", type=int, default=5, help="how many to show (default 5)")
+    p_top.add_argument("-c", "--category", help="only this category")
+    p_top.add_argument("-m", "--month", help="only this month (YYYY-MM)")
+
     p_sum = sub.add_parser("summary", help="totals per category for a month")
     p_sum.add_argument("month", nargs="?", default=date.today().strftime("%Y-%m"),
                        help="month as YYYY-MM (default: current month)")
@@ -301,6 +306,16 @@ def main(argv=None):
         for row in rows:
             print(f"#{numbers[id(row)]:<4} {row['date']}  {row['amount']:>10.2f}  {row['category']:<12} {row['note']}")
         print(f"{len(rows)} expense(s), total {sum(r['amount'] for r in rows):.2f}")
+    elif args.command == "top":
+        if args.count < 1:
+            raise SystemExit("--count must be at least 1")
+        all_rows = read_expenses(args.file)
+        numbers = {id(row): n for n, row in enumerate(all_rows, 1)}
+        rows = largest_expenses(filter_expenses(all_rows, args.category, args.month), args.count)
+        if not rows:
+            print("No expenses found.")
+        for row in rows:
+            print(f"#{numbers[id(row)]:<4} {row['date']}  {row['amount']:>10.2f}  {row['category']:<12} {row['note']}")
     elif args.command == "summary":
         total, by_category = monthly_summary(read_expenses(args.file), args.month)
         if not by_category:

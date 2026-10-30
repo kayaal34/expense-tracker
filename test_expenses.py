@@ -251,3 +251,13 @@ def test_largest_expenses_breaks_ties_by_newest():
         {"date": "2026-09-03", "amount": 1.0, "category": "c", "note": "small"},
     ]
     assert [r["note"] for r in expenses.largest_expenses(rows, 3)] == ["big", "new", "old"]
+
+
+def test_top_command(tmp_path, capsys):
+    ledger = tmp_path / "e.csv"
+    for amount in ("3", "8", "5"):
+        expenses.main(["--file", str(ledger), "add", amount, "food"])
+    capsys.readouterr()
+    expenses.main(["--file", str(ledger), "top", "-n", "2"])
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 2 and lines[0].startswith("#2") and lines[1].startswith("#3")
