@@ -123,6 +123,12 @@ def filter_expenses(rows, category=None, month=None, search=None):
     return rows
 
 
+def largest_expenses(rows, count=5):
+    """The biggest rows, newest first among equal amounts."""
+    newest_first = sorted(rows, key=lambda r: r["date"], reverse=True)
+    return sorted(newest_first, key=lambda r: r["amount"], reverse=True)[:count]
+
+
 def monthly_summary(rows, month):
     """Return (total, {category: amount}) for a YYYY-MM month."""
     by_category = defaultdict(float)
