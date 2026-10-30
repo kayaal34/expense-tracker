@@ -231,3 +231,13 @@ def test_filter_by_note_ignores_case():
     ]
     assert [r["note"] for r in expenses.filter_expenses(rows, search="market")] == ["Market run"]
     assert expenses.filter_expenses(rows, search="absent") == []
+
+
+def test_list_search_keeps_ledger_numbers(tmp_path, capsys):
+    ledger = tmp_path / "e.csv"
+    expenses.main(["--file", str(ledger), "add", "5", "food", "bread"])
+    expenses.main(["--file", str(ledger), "add", "9", "transport", "Taxi", "home"])
+    capsys.readouterr()
+    expenses.main(["--file", str(ledger), "list", "--search", "taxi"])
+    out = capsys.readouterr().out
+    assert "#2" in out and "bread" not in out and "1 expense(s), total 9.00" in out
