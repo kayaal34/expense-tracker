@@ -222,3 +222,22 @@ def test_report_cli(tmp_path, capsys):
     expenses.main(["--file", str(ledger), "report", "2026-10", "-o", str(out)])
     text = out.read_text(encoding="utf-8")
     assert text.startswith("# Expenses 2026-10") and "OVER BUDGET by 2.00" in text
+
+
+def test_filter_by_note_ignores_case():
+    rows = [
+        {"date": "2026-09-01", "amount": 5.0, "category": "food", "note": "Market run"},
+        {"date": "2026-09-02", "amount": 7.0, "category": "fun", "note": "cinema"},
+    ]
+    assert [r["note"] for r in expenses.filter_expenses(rows, search="market")] == ["Market run"]
+    assert expenses.filter_expenses(rows, search="absent") == []
+
+
+def test_list_search_keeps_ledger_numbers(tmp_path, capsys):
+    ledger = tmp_path / "e.csv"
+    expenses.main(["--file", str(ledger), "add", "5", "food", "bread"])
+    expenses.main(["--file", str(ledger), "add", "9", "transport", "Taxi", "home"])
+    capsys.readouterr()
+    expenses.main(["--file", str(ledger), "list", "--search", "taxi"])
+    out = capsys.readouterr().out
+    assert "#2" in out and "bread" not in out and "1 expense(s), total 9.00" in out

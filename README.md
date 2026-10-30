@@ -12,6 +12,7 @@ python expenses.py list                      # rows are numbered: #1, #2, ...
 python expenses.py edit 2 --amount 12.5 --note "taxi home"
 python expenses.py rm 3
 python expenses.py list --category food --month 2026-09
+python expenses.py list --search taxi      # notes containing "taxi", any case
 python expenses.py summary            # current month
 python expenses.py summary 2026-08    # a specific month
 python expenses.py summary --json summary.json

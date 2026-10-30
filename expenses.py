@@ -113,11 +113,13 @@ def import_expenses(path, source, dry_run=False):
     return added, skipped
 
 
-def filter_expenses(rows, category=None, month=None):
+def filter_expenses(rows, category=None, month=None, search=None):
     if category:
         rows = [r for r in rows if r["category"] == category.lower()]
     if month:
         rows = [r for r in rows if r["date"].startswith(month)]
+    if search:
+        rows = [r for r in rows if search.casefold() in r["note"].casefold()]
     return rows
 
 
@@ -232,6 +234,7 @@ def main(argv=None):
     p_list = sub.add_parser("list", help="show expenses")
     p_list.add_argument("-c", "--category", help="only show this category")
     p_list.add_argument("-m", "--month", help="only show this month (YYYY-MM)")
+    p_list.add_argument("-s", "--search", help="only show notes containing this text")
 
     p_sum = sub.add_parser("summary", help="totals per category for a month")
     p_sum.add_argument("month", nargs="?", default=date.today().strftime("%Y-%m"),
@@ -287,7 +290,7 @@ def main(argv=None):
                 print(f"Warning: '{row['category']}' is over its budget for {month}: {budget_status(spent, budget)}")
     elif args.command == "list":
         all_rows = read_expenses(args.file)
-        rows = filter_expenses(all_rows, args.category, args.month)
+        rows = filter_expenses(all_rows, args.category, args.month, args.search)
         numbers = {id(row): n for n, row in enumerate(all_rows, 1)}
         for row in rows:
             print(f"#{numbers[id(row)]:<4} {row['date']}  {row['amount']:>10.2f}  {row['category']:<12} {row['note']}")
