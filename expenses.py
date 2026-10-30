@@ -113,11 +113,13 @@ def import_expenses(path, source, dry_run=False):
     return added, skipped
 
 
-def filter_expenses(rows, category=None, month=None):
+def filter_expenses(rows, category=None, month=None, search=None):
     if category:
         rows = [r for r in rows if r["category"] == category.lower()]
     if month:
         rows = [r for r in rows if r["date"].startswith(month)]
+    if search:
+        rows = [r for r in rows if search.casefold() in r["note"].casefold()]
     return rows
 
 
